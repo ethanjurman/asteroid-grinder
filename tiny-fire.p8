@@ -288,6 +288,8 @@ function draw_menu()
 	 y_shift=sin((frame/2-i)%32/32)*6
 	 spr(32+i,23+i*9,y_shift+20)
 	end
+	-- credit
+	print("by ethan jurman", 33,40,13)
 	-- start game button
 	local x=st_btn.x
 	local y=st_btn.y
