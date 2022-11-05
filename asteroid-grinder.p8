@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 38
 __lua__
--- tiny-fire
+-- asteroid grinder
 objects_init = {}
 objects_init.game={}
 objects_init.menu={}
@@ -269,6 +269,10 @@ function is_mouse_on_btn()
 end
 
 function update_menu()
+ if (btn(❎) or btn(🅾️)) then
+  game_state="game"
+  _init()
+ end
  if is_mouse_on_btn() and
     mouse.click==1 then
  	game_state="game"
@@ -329,55 +333,65 @@ add_game_loop(menu,"menu")
 ship={}
 
 function init_ship()
- ship.x=0
+ ship.x=64
  ship.y=0
  ship.s=0
- ship.blts={}
  ship.hp=5
  ship.in_grind=false
  ship.grind_l=false
  ship.grind_r=false
+ ship.btn_goal=64
+ ship.inv=0
 end
 
 function take_damage()
 	ship.hp-=1
 	cam_shake=30
+	ship.inv=120
 end
 
 function update_ship()
  -- update ship with mouse
- local goal_delta=abs(mouse.x-ship.x)
- local trans_spd=15
- if (ship.x<mouse.x) then
- 	ship.x=ship.x+(goal_delta/trans_spd)
- 	ship.s=1
- elseif (ship.x>mouse.x) then
- 	ship.x=ship.x-(goal_delta/trans_spd)
- 	ship.s=2
- end
- if (goal_delta<4) ship.s=0
- ship.y=90
- 
- -- update bullets
- for b in all(ship.blts) do
- 	b.x+=b.x_delta
- 	b.y-=1
- 	if (b.y<0) del(ship.blts, b)
- 	for r in all(rocks) do
- 	 -- hit rock
- 		if (in_rock_l(r,b.x,b.y)) then
- 			del(ship.blts, b)
- 			respawn_rock(r)
- 			sfx(2)
- 			score+=10
-			end
+ if (mouse.on) then
+  local trans_spd=15
+	 local goal_delta=abs(mouse.x-ship.x) 
+	 if (ship.x<mouse.x) then
+	 	ship.x=ship.x+(goal_delta/trans_spd)
+	 	ship.s=1
+	 elseif (ship.x>mouse.x) then
+	 	ship.x=ship.x-(goal_delta/trans_spd)
+	 	ship.s=2
+	 end
+	 if (goal_delta<4) ship.s=0
+	else
+	 local trans_spd=5
+	-- update mouse with controls
+	 if (btn(⬅️)) ship.btn_goal=ship.x-trans_spd
+	 if (btn(➡️)) ship.btn_goal=ship.x+trans_spd
+  local goal_delta=abs(ship.btn_goal-ship.x)
+
+	 if ship.x<ship.btn_goal then
+	  ship.x=ship.x+(goal_delta/trans_spd)
+	  ship.s=1
 		end
- end
+	 if ship.x>ship.btn_goal then
+	  ship.x=ship.x-(goal_delta/trans_spd)
+	  ship.s=2
+	 end
+	 if (goal_delta<2) ship.s=0
+
+	end
+	
+ ship.y=90
  
  ship.in_grind=false
  ship.grind_r=false
  ship.grind_l=false
  
+ if ship.inv > 0 then
+  ship.inv-=1
+  return -- don't calc hp & grind
+ end
  -- update hp & grind
  for r in all(rocks) do
  	if in_rock(r, ship.x+2,ship.y+5,ship.x+4,ship.y+6) then
@@ -398,21 +412,9 @@ function update_ship()
  end
 end
 
-function fire_bullet()
- local goal_delta=mouse.x-ship.x
- local trans_spd=15
- local bullet_x_shift=(goal_delta/trans_spd)
-
- local bullet={}
- bullet.x = ship.x+3
- bullet.y = ship.y
- bullet.x_delta = bullet_x_shift
-	add(ship.blts, bullet)
-end
-
 function draw_ship()
- for b in all(ship.blts) do
- 	pset(b.x,b.y,7)
+ if (ship.inv%2==1) then
+  return
  end
  spr(ship.s+4,ship.x,ship.y)
  --rectfill(ship.x+2,ship.y+5,ship.x+4,ship.y+6,13)
@@ -429,7 +431,6 @@ end
 ship.init = init_ship
 ship.draw = draw_ship
 ship.update = update_ship
-ship.fire = fire_bullet
 add_game_loop(ship)
 add_game_loop(ship,"menu")
 -->8
@@ -437,13 +438,24 @@ add_game_loop(ship,"menu")
 
 mouse={}
 mouse.click=0
-mouse.x=0
-mouse.y=0
+mouse.x=stat(32)-1
+mouse.y=stat(33)-1
+mouse.on=false
 function init_mouse()
 	poke(0x5f2d, 1)
 end
 
 function update_mouse()
+ if (btn(⬆️)) mouse.on=false
+ if (btn(⬇️)) mouse.on=false
+ if (btn(⬅️)) mouse.on=false
+ if (btn(➡️)) mouse.on=false
+ if (btn(❎)) mouse.on=false
+ if (btn(🅾️)) mouse.on=false
+ if mouse.x!=stat(32)-1 or 
+    mouse.y!=stat(33)-1 then
+  mouse.on=true
+ end
  mouse.x=stat(32)-1
  mouse.y=stat(33)-1
  if stat(34) == 1 and 
@@ -458,6 +470,9 @@ function update_mouse()
 end
 
 function draw_mouse()
+ if mouse.on==false then
+  return
+ end
  if mouse.click==1 then
   spr(3,mouse.x,mouse.y)
  else
@@ -492,7 +507,8 @@ function game_over_update()
 		music(-1)
 	end
 	if elapse > 200 and
-	   stat(34) == 1 -- mouse click
+	   (stat(34) == 1 or -- mouse click
+				btnp(❎) or btnp(🅾️)) -- btn press
 	   then
 	 elapse=0
 	 game_over_frame=-1
